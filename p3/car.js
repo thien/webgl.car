@@ -1,4 +1,3 @@
-// Directional lighting demo: By Frederick Li
 // Vertex shader program
 var VSHADER_SOURCE =
 	'attribute vec4 a_Position;\n' +
@@ -59,9 +58,20 @@ var viewMatrix = new Matrix4(); // The view matrix
 var projMatrix = new Matrix4(); // The projection matrix
 var g_normalMatrix = new Matrix4(); // Coordinate transformation matrix for normals
 
-var ANGLE_STEP = 3.0; // The increments of rotation angle (degrees)
 var g_xAngle = 0.0; // The rotation x angle (degrees)
 var g_yAngle = 0.0; // The rotation y angle (degrees)
+
+var car_position_x = 0;
+var car_position_y = 0;
+
+var plane_size_x = 50;
+var plane_size_z = 50;
+
+var MOVE_STEP = 1;
+var ANGLE_STEP = 70.0;     // The increments of rotation angle (degrees)
+
+var g_frontWheelTurnAngle = 0.0;
+var g_WheelSpinAngle = 0.0;
 
 function main() {
 	// Retrieve <canvas> element
@@ -151,7 +161,7 @@ function main() {
 	gl.uniform3f(u_LightColor, 1, 1, 1);
 
 	// Set the light direction (in the world coordinate)
-	var lightDirection = new Vector3([5.5, 3.1, 4.0]);
+	var lightDirection = new Vector3([7,7,7.0]);
 
 	// Normalize the light direction
 	lightDirection.normalize();
@@ -171,8 +181,25 @@ function main() {
 	gl.uniform3fv(u_AmbientLight, AmbientLight.elements);
 
 	// Calculate the view matrix and the projection matrix
-	viewMatrix.setLookAt(0, 0, 15, 0, 0, -100, 0, 1, 0);
-	projMatrix.setPerspective(30, canvas.width / canvas.height, 1, 100);
+
+	  // calculate the view matrix and projection matrix
+	  // viewMatrix.setLookAt(0, 0, 5, 0, 0, 0, 0, 1, 0);
+	  // angle (x), angle (y), zoom,  _____, _, rotation of camera, inv,
+
+
+	  // sets of three (x,y,z)
+	  // pos cam, pos along dierction you wanna look at, up axis,
+
+	  // var car_position_x = 0;
+// var car_position_y = 0;
+
+	viewMatrix.setLookAt(45, 45, 45, car_position_x, -15, car_position_y, 0, 0.04, 0);
+
+  	// viewMatrix.setLookAt(20, 2, 10, -10, -15, 0, 0.0, 0.02, 0);
+
+	// viewMatrix.setLookAt(0, 0, 15, 0, 0, -100, 0, 1, 0);
+
+	projMatrix.setPerspective(40, canvas.width / canvas.height, 1, 100);
 
 	// Pass the model, view, and projection matrix to the uniform variable respectively
 	gl.uniformMatrix4fv(u_ViewMatrix, false, viewMatrix.elements);
@@ -186,19 +213,36 @@ function main() {
 	draw(gl, u_ModelMatrix, u_NormalMatrix, u_isLighting);
 }
 
+
 function keydown(ev, gl, u_ModelMatrix, u_NormalMatrix, u_isLighting) {
 	switch (ev.keyCode) {
 		case 40: // Up arrow key -> the positive rotation of arm1 around the y-axis
-			g_xAngle = (g_xAngle + ANGLE_STEP) % 360;
+			if ((car_position_y + 1) < (plane_size_z/2)){
+				g_xAngle = (g_xAngle + ANGLE_STEP) % 360;
+				g_WheelSpinAngle = (g_WheelSpinAngle + (ANGLE_STEP * MOVE_STEP)) % 360;
+				car_position_y += MOVE_STEP;
+			}
 			break;
 		case 38: // Down arrow key -> the negative rotation of arm1 around the y-axis
-			g_xAngle = (g_xAngle - ANGLE_STEP) % 360;
+			if ((car_position_y + 1) > (-plane_size_z/2)){
+				g_xAngle = (g_xAngle - ANGLE_STEP) % 360;
+				g_WheelSpinAngle = (g_WheelSpinAngle - (ANGLE_STEP * MOVE_STEP)) % 360;
+				car_position_y -= MOVE_STEP;
+			}
 			break;
 		case 39: // Right arrow key -> the positive rotation of arm1 around the y-axis
-			g_yAngle = (g_yAngle + ANGLE_STEP) % 360;
+			if ((car_position_x + 1) < (plane_size_x/2)){
+				g_yAngle = (g_yAngle + ANGLE_STEP) % 360;
+				g_frontWheelTurnAngle = (g_frontWheelTurnAngle + (ANGLE_STEP * MOVE_STEP)) % 360;
+				car_position_x += MOVE_STEP;
+			}
 			break;
 		case 37: // Left arrow key -> the negative rotation of arm1 around the y-axis
-			g_yAngle = (g_yAngle - ANGLE_STEP) % 360;
+			if ((car_position_x + 1) > (-plane_size_x/2)){
+				g_yAngle = (g_yAngle - ANGLE_STEP) % 360;
+				g_frontWheelTurnAngle = (g_frontWheelTurnAngle - (ANGLE_STEP * MOVE_STEP)) % 360;
+				car_position_x -= MOVE_STEP;
+			}
 			break;
 		default:
 			return; // Skip drawing at no effective action
@@ -394,11 +438,18 @@ function draw(gl, u_ModelMatrix, u_NormalMatrix, u_isLighting) {
 		return;
 	}
 
-	// Rotate, and then translate
-	modelMatrix.setTranslate(0, 0, 0); // Translation (No translation is supported here)
-	modelMatrix.rotate(g_yAngle, 0, 1, 0); // Rotate along y axis
-	modelMatrix.rotate(g_xAngle, 1, 0, 0); // Rotate along x axis
+		// plane
+	pushMatrix(modelMatrix);
+	modelMatrix.translate(0, -0.5, 0); // Translation
+	modelMatrix.scale(plane_size_x,0,plane_size_z); // Scale
+	drawbox(gl, u_ModelMatrix, u_NormalMatrix, n);
+	modelMatrix = popMatrix();
 
+	// Rotate, and then translate
+	modelMatrix.setTranslate(car_position_x, 0, car_position_y); // Translation (No translation is supported here)
+	// modelMatrix.rotate(g_yAngle, 0, 1, 0); // Rotate along y axis
+	// modelMatrix.rotate(g_xAngle, 1, 0, 0); // Rotate along x axis
+	modelMatrix.translate(0, 0.5, 0); // Translation
 	// Model the car door (left)
 	pushMatrix(modelMatrix);
 	modelMatrix.translate(1.1, 0.5, 0); // Translation
@@ -413,10 +464,19 @@ function draw(gl, u_ModelMatrix, u_NormalMatrix, u_isLighting) {
 	drawbox(gl, u_ModelMatrix, u_NormalMatrix, n);
 	modelMatrix = popMatrix();
 
+	// var g_frontWheelTurnAngle = 0.0;
+// var g_WheelSpinAngle = 0.0;
+
 	// Model the car wheel (front left)
 	pushMatrix(modelMatrix);
 	modelMatrix.translate(1.2, -0.5, 1.5); // Translation
 	modelMatrix.scale(0.2, 1, 1); // Scale
+	modelMatrix.rotate(g_WheelSpinAngle, 1.0, 0.0, 0.0); 
+
+	// for rotation
+	modelMatrix.rotate(g_frontWheelTurnAngle, 0.0, 0.0, 1.0); 
+	// for rotation
+
 	drawbox(gl, u_ModelMatrix, u_NormalMatrix, n);
 	modelMatrix = popMatrix();
 
@@ -424,6 +484,12 @@ function draw(gl, u_ModelMatrix, u_NormalMatrix, u_isLighting) {
 	pushMatrix(modelMatrix);
 	modelMatrix.translate(-1.2, -0.5, 1.5); // Translation
 	modelMatrix.scale(0.2, 1, 1); // Scale
+	modelMatrix.rotate(g_WheelSpinAngle, 1.0, 0.0, 0.0); 
+
+	// for rotation
+	modelMatrix.rotate(g_frontWheelTurnAngle, 0.0, 0.0, 1.0); 
+	// for rotation
+
 	drawbox(gl, u_ModelMatrix, u_NormalMatrix, n);
 	modelMatrix = popMatrix();
 
@@ -431,6 +497,7 @@ function draw(gl, u_ModelMatrix, u_NormalMatrix, u_isLighting) {
 	pushMatrix(modelMatrix);
 	modelMatrix.translate(-1.2, -0.5, -1.5); // Translation
 	modelMatrix.scale(0.2, 1, 1); // Scale
+	modelMatrix.rotate(g_WheelSpinAngle, 1.0, 0.0, 0.0); 
 	drawbox(gl, u_ModelMatrix, u_NormalMatrix, n);
 	modelMatrix = popMatrix();
 
@@ -438,12 +505,13 @@ function draw(gl, u_ModelMatrix, u_NormalMatrix, u_isLighting) {
 	pushMatrix(modelMatrix);
 	modelMatrix.translate(1.2, -0.5, -1.5); // Translation
 	modelMatrix.scale(0.2, 1, 1); // Scale
+	modelMatrix.rotate(g_WheelSpinAngle, 1.0, 0.0, 0.0); 
 	drawbox(gl, u_ModelMatrix, u_NormalMatrix, n);
 	modelMatrix = popMatrix();
 
 	// Model the car top
 	pushMatrix(modelMatrix);
-	modelMatrix.translate(0, 1, 0); // Translation
+	modelMatrix.translate(0, 1, 0.5); // Translation
 	modelMatrix.scale(2.0, 1, 4); // Scale
 	drawbox(gl, u_ModelMatrix, u_NormalMatrix, n);
 	modelMatrix = popMatrix();
