@@ -73,7 +73,7 @@ var car = {
 		'x' : 0,
 		'z' : 0
 	},
-	'speed' : 0,
+	'speed' : 1,
 	'rotation' : {
 		'angle' : 0,
 		'step'  : 1
@@ -217,43 +217,45 @@ function initGL(){
 	}
 }
 
-// window.setInterval(initGL, 16);
+var goodkeys = {
+	'down' : 40,
+	'up' : 38,
+	'right': 39,
+	'left' : 37
+};
 
 function cooler_keydown(keycode, gl, u_ModelMatrix, u_NormalMatrix, u_isLighting) {
-	
-	var keys = {
-		'up' : 40,
-		'down' : 38,
-		'right': 39,
-		'left' : 37
-	};
+	var check = false;
+	if (keycode == goodkeys.up){
+		check = true;
+		console.log("up");
+		car.position.x += car.speed * Math.cos(car.front.rotation);
+		car.position.z += car.speed * -Math.sin(car.front.rotation);
 
-	switch (keycode) {
-		case keys.up: 
-			car.position.x -= 1;
-			break;
-		case keys.down: 
-			car.position.x += 1;
-			break;
-		case keys.right: 
-			car.position.z += 1;
-			car.front.rotation -= car.anglestep;
-			break;
-		case keys.left: 
-			car.position.z -= 1;
-			car.front.rotation += car.anglestep;
-			break;
-		default:
-			// do nothing
-			return;
+		// calculate the rotation around the front wheel
 	}
-	// calculate x, z coords.
-	// car.position.x += car.speed * Math.sin(car.front.rotation);
-	// car.position.z += car.speed * -Math.cos(car.front.rotation);
+	if (keycode == goodkeys.down){
+		check = true;
+		console.log("down");
+		car.position.x -= car.speed * Math.cos(car.front.rotation);
+		car.position.z -= car.speed * -Math.sin(car.front.rotation);
+	}
+	if (keycode == goodkeys.right){
+		check = true;
+		console.log("right");
+		car.front.rotation -= car.anglestep;
+	} 
+	if (keycode == goodkeys.left){
+		check = true;
+		console.log("left");
+		car.front.rotation += car.anglestep;
+	}
 
-	console.log("car pos:", car.position.x,",",car.position.z);
-	// draw scene
-	draw(gl, u_ModelMatrix, u_NormalMatrix, u_isLighting);
+	if (check){
+		console.log("car pos:", car.position.x,",",car.position.z);
+		// draw scene
+		draw(gl, u_ModelMatrix, u_NormalMatrix, u_isLighting);
+	}
 }
 
 function initialiseColouredCubeVertexBuffer(gl, colours) {
@@ -441,17 +443,41 @@ function draw(gl, u_ModelMatrix, u_NormalMatrix, u_isLighting) {
 		drawbox(gl, u_ModelMatrix, u_NormalMatrix, n);
 		matrices.model = popMatrix();
 
+
+		// set car base colour
+		n = initialiseColouredCubeVertexBuffer(gl, [0.3,0.25,0.7]);
+
+		//Model the car wheel (back left)
+		pushMatrix(matrices.model);
+		matrices.model.translate(-1.2, -0.5, -1.5); // Translation
+		// matrices.model.rotate(car.front.rotation, 0.0, 1.0, 0.0); 
+		matrices.model.rotate(car.wheel.angle, 1.0, 0.0, 0.0); 
+		matrices.model.scale(0.2, 1, 1); // Scale
+		var bf_normal = [matrices.g_normal.elements[0], matrices.g_normal.elements[2]];
+		drawbox(gl, u_ModelMatrix, u_NormalMatrix, n);
+		matrices.model = popMatrix();
+
+		//Model the car wheel (back right)
+		pushMatrix(matrices.model);
+		matrices.model.translate(1.2, -0.5, -1.5); // Translation
+		matrices.model.rotate(car.wheel.angle, 1.0, 0.0, 0.0); 
+		matrices.model.scale(0.2, 1, 1); // Scale
+		var br_normal = [matrices.g_normal.elements[0], matrices.g_normal.elements[2]];
+		drawbox(gl, u_ModelMatrix, u_NormalMatrix, n);
+		matrices.model = popMatrix();
+
+		// set car base colour
+		n = initialiseColouredCubeVertexBuffer(gl, [0.6,0.2,0.55]);
+
 		// Model the car wheel (front left)
 		pushMatrix(matrices.model);
 		matrices.model.translate(1.2, -0.5, 1.5); // Translation
 		matrices.model.rotate(car.front.rotation, 0.0, 1.0, 0.0); 
 		matrices.model.rotate(car.wheel.angle, 1.0, 0.0, 0.0); 
 		matrices.model.scale(0.2, 1, 1); // Scale
+		var fl_normal = [matrices.g_normal.elements[0], matrices.g_normal.elements[2]];
 		drawbox(gl, u_ModelMatrix, u_NormalMatrix, n);
 		matrices.model = popMatrix();
-
-		// set car base colour
-		n = initialiseColouredCubeVertexBuffer(gl, [0.6,0.2,0.55]);
 
 		//Model the car wheel (front right)
 		pushMatrix(matrices.model);
@@ -459,27 +485,7 @@ function draw(gl, u_ModelMatrix, u_NormalMatrix, u_isLighting) {
 		matrices.model.scale(0.2, 1, 1); // Scale
 		matrices.model.rotate(car.front.rotation, 0.0, 1.0, 0.0); 
 		matrices.model.rotate(car.wheel.angle, 1.0, 0.0, 0.0); 
-		drawbox(gl, u_ModelMatrix, u_NormalMatrix, n);
-		matrices.model = popMatrix();
-
-		// set car base colour
-		n = initialiseColouredCubeVertexBuffer(gl, [0.3,0.25,0.7]);
-
-		//Model the car wheel (front left)
-		pushMatrix(matrices.model);
-		matrices.model.translate(-1.2, -0.5, -1.5); // Translation
-		// matrices.model.rotate(car.front.rotation, 0.0, 1.0, 0.0); 
-		matrices.model.rotate(car.wheel.angle, 1.0, 0.0, 0.0); 
-		matrices.model.scale(0.2, 1, 1); // Scale
-		drawbox(gl, u_ModelMatrix, u_NormalMatrix, n);
-		matrices.model = popMatrix();
-
-		//Model the car wheel (front right)
-		pushMatrix(matrices.model);
-		matrices.model.translate(1.2, -0.5, -1.5); // Translation
-		// matrices.model.rotate(car.front.rotation, 0.0, 1.0, 0.0); 
-		matrices.model.rotate(car.wheel.angle, 1.0, 0.0, 0.0); 
-		matrices.model.scale(0.2, 1, 1); // Scale
+		var fr_normal = [matrices.g_normal.elements[0], matrices.g_normal.elements[2]];
 		drawbox(gl, u_ModelMatrix, u_NormalMatrix, n);
 		matrices.model = popMatrix();
 	}
