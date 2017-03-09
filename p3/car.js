@@ -87,7 +87,8 @@ var car = {
 		'step': 1
 	},
 	'movestep' : 1,
-	'anglestep' : 10
+	'anglestep' : 10,
+	'forward_vector' : [0,0],
 };
 
 var plane = {
@@ -158,7 +159,7 @@ function main() {
 	gl.uniform3fv(u_LightDirection, lightDirection.elements);
 
 	// Set the light direction (in the world coordinate)
-	var lightPosition = new Vector3([0,10,0]);
+	var lightPosition = new Vector3([0,1,0]);
 	// Normalize the light direction
 	gl.uniform3fv(u_LightPosition, lightPosition.elements);
 
@@ -218,44 +219,57 @@ function initGL(){
 }
 
 var goodkeys = {
-	'down' : 40,
-	'up' : 38,
-	'right': 39,
-	'left' : 37
+	'down' : [40, 83],
+	'up' : [38, 87],
+	'right': [39, 68],
+	'left' : [37, 65]
 };
 
 function cooler_keydown(keycode, gl, u_ModelMatrix, u_NormalMatrix, u_isLighting) {
 	var check = false;
-	if (keycode == goodkeys.up){
+	// console.log(keycode);
+
+	// if (goodkeys.up.indexOf(keycode) != -1){
+	if (goodkeys.up.indexOf(keycode) != -1){
 		check = true;
-		console.log("up");
-		car.position.x += car.speed * Math.cos(car.front.rotation);
-		car.position.z += car.speed * -Math.sin(car.front.rotation);
+		// console.log("up");
+		car.speed += car.speed  + 1;
 
 		// calculate the rotation around the front wheel
 	}
-	if (keycode == goodkeys.down){
+	if (goodkeys.down.indexOf(keycode) != -1){
 		check = true;
-		console.log("down");
-		car.position.x -= car.speed * Math.cos(car.front.rotation);
-		car.position.z -= car.speed * -Math.sin(car.front.rotation);
+		car.speed += car.speed  - 1;
+		// console.log("down");
+		// car.position.x -= car.speed * Math.cos(car.front.rotation);
+		// car.position.z -= car.speed * Math.sin(car.front.rotation);
 	}
-	if (keycode == goodkeys.right){
+	if (goodkeys.right.indexOf(keycode) != -1){
 		check = true;
-		console.log("right");
-		car.front.rotation -= car.anglestep;
+		// console.log("right");
+		// car.position.z += 1;
+		car.front.rotation = (car.front.rotation + car.anglestep % 360);
 	} 
-	if (keycode == goodkeys.left){
+	if (goodkeys.left.indexOf(keycode) != -1){
 		check = true;
-		console.log("left");
-		car.front.rotation += car.anglestep;
+		// console.log("left");
+		// car.position.z -= 1;
+		car.front.rotation = (car.front.rotation - car.anglestep % 360);
 	}
 
+	car.position.x = car.position.x + Math.cos(deg2rad(car.front.rotation));
+	car.position.z = car.position.z + Math.sin(deg2rad(car.front.rotation));
+	
 	if (check){
-		console.log("car pos:", car.position.x,",",car.position.z);
+		// console.log("car pos:", car.position.x,",",car.position.z);
 		// draw scene
 		draw(gl, u_ModelMatrix, u_NormalMatrix, u_isLighting);
 	}
+}
+
+function deg2rad(angle){
+	// convert degree to radian
+	return angle * Math.PI / 180;
 }
 
 function initialiseColouredCubeVertexBuffer(gl, colours) {
@@ -399,7 +413,7 @@ function draw(gl, u_ModelMatrix, u_NormalMatrix, u_isLighting) {
 		matrices.model.setTranslate(car.position.x, 0, car.position.z); // Translation (No translation is supported here)
 		// matrices.model.rotate(g_yAngle, 0, 1, 0); // Rotate along y axis
 		// matrices.model.rotate(g_xAngle, 1, 0, 0); // Rotate along x axis
-		matrices.model.rotate(car.rotation.angle, 0.0, 1.0, 0.0); 
+		matrices.model.rotate(car.front.rotation, 0.0, -1.0, 0.0); 
 		matrices.model.translate(0, 0.5, 0); // Translation
 		matrices.model.rotate(90, 0.0, 1.0, 0.0); 
 
@@ -410,6 +424,8 @@ function draw(gl, u_ModelMatrix, u_NormalMatrix, u_isLighting) {
 		pushMatrix(matrices.model);
 		matrices.model.translate(0, 0, 0.2); // Translation
 		matrices.model.scale(2.2, 1.2, 5); // Scale
+		car.forward_vector = [matrices.g_normal.elements[12], -matrices.g_normal.elements[14]];
+		// console.log("forward vector", car.forward_vector);
 		drawbox(gl, u_ModelMatrix, u_NormalMatrix, n);
 		matrices.model = popMatrix();
 
