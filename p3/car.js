@@ -1,5 +1,4 @@
-// Vertex shader program
-var VSHADER_SOURCE =
+var vertex_shader_source =
 	'attribute vec4 a_Position;\n' +
 	'attribute vec4 a_Color;\n' +
 	'attribute vec4 a_Normal;\n' + // Normal
@@ -41,30 +40,22 @@ var VSHADER_SOURCE =
 	'  {\n' +
 	'     v_Color = a_Color;\n' +
 	'  }\n' +
-	'}\n';
+	'}\n'; // Vertex shader program
 
-// Fragment shader program
-var FSHADER_SOURCE =
+var fragment_shader_source =
 	'#ifdef GL_ES\n' +
 	'precision mediump float;\n' +
 	'#endif\n' +
 	'varying vec4 v_Color;\n' +
 	'void main() {\n' +
 	'  gl_FragColor = v_Color;\n' +
-	'}\n';
+	'}\n'; // Fragment shader program
 
 var matrices = {
-	// The model matrix
-	'model' : new Matrix4(),
-
-	// The view matrix
-	'view' : new Matrix4(),
-
-	// The projection matrix
-	'projection' : new Matrix4(),
-
-	// Coordinate transformation matrix for normals
-	'g_normal' : new Matrix4()
+	'model' : new Matrix4(),		// The model matrix
+	'view' : new Matrix4(),			// The view matrix
+	'projection' : new Matrix4(),	// The projection matrix
+	'g_normal' : new Matrix4()		// Coordinate transformation matrix for normals
 };
 
 var car = {
@@ -74,10 +65,6 @@ var car = {
 		'z' : 0
 	},
 	'speed' : 1,
-	'rotation' : {
-		'angle' : 0,
-		'step'  : 1
-	},
 	'wheel' : {
 		'angle' : 0,
 		'step' : 0,
@@ -87,8 +74,7 @@ var car = {
 		'step': 1
 	},
 	'movestep' : 1,
-	'anglestep' : 10,
-	'forward_vector' : [0,0],
+	'anglestep' : 10
 };
 
 var plane = {
@@ -97,79 +83,78 @@ var plane = {
 	'enabled': true
 };
 
+var camera = {
+	'view' : {
+		'x' : 0, // The rotation x angle (degrees)
+		'y' : 0  // The rotation y angle (degrees)
+	}
+};
+
+var u = { // storage locations of uniform attributes
+	ModelMatrix : 0,
+	ViewMatrix : 0,
+	NormalMatrix : 0,
+	ProjMatrix : 0,
+	LightColour : 0, 
+	LightDirection : 0
+};
+
+var settings = {
+	bg_color : [0.2,1,0.2,0.7],
+	light_color : [1,1,1],
+	light_direction : [7,7,7.0],
+	light_position : [0,1,0],
+	ambient_light : [0.3, 0.5, 0.7]
+};
+
+// Retrieve <canvas> element
+var canvas = document.getElementById('webgl');
+
+// Get the rendering context for WebGL
+var gl = getWebGLContext(canvas);
+
 var keys = [];
 
-var g_xAngle = 0.0; // The rotation x angle (degrees)
-var g_yAngle = 0.0; // The rotation y angle (degrees)
-
-function main() {
-	// Retrieve <canvas> element
-	var canvas = document.getElementById('webgl');
-
-	// Get the rendering context for WebGL
-	var gl = getWebGLContext(canvas);
+function initialise() {
 	if (!gl) {
 		console.log('Failed to get the rendering context for WebGL');
-		return;
-	}
+		return;}
 
 	// Initialize shaders
-	if (!initShaders(gl, VSHADER_SOURCE, FSHADER_SOURCE)) {
+	if (!initShaders(gl, vertex_shader_source, fragment_shader_source)) {
 		console.log('Failed to intialize shaders.');
-		return;
-	}
+		return;}
 
-	// Set clear color and enable hidden surface removal
-	gl.clearColor(0.0, 0.0, 0.0, 1.0);
-	gl.enable(gl.DEPTH_TEST);
+	// deal with clear colour and depth buffers
+	initialiseColors();
 
-	// Clear color and depth buffer
-	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-	// Get the storage locations of uniform attributes
-	var uniform_attributes = {
-
-	};
-
-	var u_ModelMatrix = gl.getUniformLocation(gl.program, 'u_ModelMatrix');
-	var u_ViewMatrix = gl.getUniformLocation(gl.program, 'u_ViewMatrix');
-	var u_NormalMatrix = gl.getUniformLocation(gl.program, 'u_NormalMatrix');
-	var u_ProjMatrix = gl.getUniformLocation(gl.program, 'u_ProjMatrix');
-	var u_LightColor = gl.getUniformLocation(gl.program, 'u_LightColor');
-	var u_LightDirection = gl.getUniformLocation(gl.program, 'u_LightDirection');
-
-	// !point light implementation
-	var u_LightPosition = gl.getUniformLocation(gl.program, 'u_LightPosition');
-	var u_AmbientLight = gl.getUniformLocation(gl.program, 'u_AmbientLight');
-
-	// Trigger using lighting or not
-	var u_isLighting = gl.getUniformLocation(gl.program, 'u_isLighting');
+	// deal with storage locations of the uniform attributes
+	initUniformAttributes();
 
 	// check Status of items to see whether they have initiated.
-	checkStatus(u_ModelMatrix, u_ViewMatrix, u_NormalMatrix,u_ProjMatrix, u_LightColor, u_LightDirection,u_isLighting);
+	checkStatus(u.ModelMatrix, u.ViewMatrix, u.NormalMatrix,u.ProjMatrix, u.LightColor, u.LightDirection,u.isLighting);
 
 	// Set the light color (white)
-	gl.uniform3f(u_LightColor, 1, 1, 1);
+	gl.uniform3f(u.LightColor, settings.light_color[0], settings.light_color[1], settings.light_color[2]);
 
 	// Set the light direction (in the world coordinate)
-	var lightDirection = new Vector3([7,7,7.0]);
+	var lightDirection = new Vector3(settings.light_direction);
 
 	// Normalize the light direction
 	lightDirection.normalize();
-	gl.uniform3fv(u_LightDirection, lightDirection.elements);
+	gl.uniform3fv(u.LightDirection, lightDirection.elements);
 
 	// Set the light direction (in the world coordinate)
-	var lightPosition = new Vector3([0,1,0]);
-	// Normalize the light direction
-	gl.uniform3fv(u_LightPosition, lightPosition.elements);
+	var lightPosition = new Vector3(settings.light_position);
+	gl.uniform3fv(u.LightPosition, lightPosition.elements);
 
 	// set up ambient light
 	// Set the light direction (in the world coordinate)
-	var AmbientLight = new Vector3([0.3, 0.5, 0.7]);
+	var AmbientLight = new Vector3(settings.ambient_light);
 
 	// Normalize the light direction
 	AmbientLight.normalize();
-	gl.uniform3fv(u_AmbientLight, AmbientLight.elements);
+	gl.uniform3fv(u.AmbientLight, AmbientLight.elements);
 
 	// Calculate the view matrix and the projection matrix
 
@@ -195,27 +180,36 @@ function main() {
 	matrices.projection.setPerspective(40, canvas.width / canvas.height, 1, 120);
 
 	// Pass the model, view, and projection matrix to the uniform variable respectively
-	gl.uniformMatrix4fv(u_ViewMatrix, false, matrices.view.elements);
-	gl.uniformMatrix4fv(u_ProjMatrix, false, matrices.projection.elements);
+	gl.uniformMatrix4fv(u.ViewMatrix, false, matrices.view.elements);
+	gl.uniformMatrix4fv(u.ProjMatrix, false, matrices.projection.elements);
 
 	// deal with car movements
 
 	document.onkeydown = function(e){
 		keys.push(e.keyCode);
-		while (keys.length > 0){
-			cooler_keydown(keys.shift(), gl, u_ModelMatrix, u_NormalMatrix, u_isLighting);
-		}
-
 	};
 
-	// draw!
-	draw(gl, u_ModelMatrix, u_NormalMatrix, u_isLighting);
+	// draw the first screen.
+	draw(gl, u.ModelMatrix, u.NormalMatrix, u.isLighting);
+
+	// loop the drawing
+	gameLoop();
 }
 
-function initGL(){
-	while (keys.length > 0){
-			cooler_keydown(keys.shift(), gl, u_ModelMatrix, u_NormalMatrix, u_isLighting);
+var keyPressed = {};
+
+document.addEventListener('keydown', function(e) {
+   keyPressed[e.keyCode] = true;
+}, false);
+document.addEventListener('keyup', function(e) {
+   keyPressed[e.keyCode] = false;
+}, false);
+
+function gameLoop() {
+    while (keys.length > 0){
+		keydowns(keys.shift(), gl, u.ModelMatrix, u.NormalMatrix, u.isLighting);
 	}
+   setTimeout(gameLoop, 5);
 }
 
 var goodkeys = {
@@ -225,51 +219,31 @@ var goodkeys = {
 	'left' : [37, 65]
 };
 
-function cooler_keydown(keycode, gl, u_ModelMatrix, u_NormalMatrix, u_isLighting) {
+function keydowns(keycode, gl, u_ModelMatrix, u_NormalMatrix, u_isLighting) {
 	var check = false;
-	// console.log(keycode);
 
-	// if (goodkeys.up.indexOf(keycode) != -1){
 	if (goodkeys.up.indexOf(keycode) != -1){
 		check = true;
-		// console.log("up");
-		car.speed += car.speed  + 1;
-
-		// calculate the rotation around the front wheel
+		car.speed = car.speed  + 1;
 	}
 	if (goodkeys.down.indexOf(keycode) != -1){
 		check = true;
-		car.speed += car.speed  - 1;
-		// console.log("down");
-		// car.position.x -= car.speed * Math.cos(car.front.rotation);
-		// car.position.z -= car.speed * Math.sin(car.front.rotation);
+		car.speed = car.speed  - 1;
 	}
 	if (goodkeys.right.indexOf(keycode) != -1){
 		check = true;
-		// console.log("right");
-		// car.position.z += 1;
 		car.front.rotation = (car.front.rotation + car.anglestep % 360);
 	} 
 	if (goodkeys.left.indexOf(keycode) != -1){
 		check = true;
-		// console.log("left");
-		// car.position.z -= 1;
 		car.front.rotation = (car.front.rotation - car.anglestep % 360);
 	}
-
-	car.position.x = car.position.x + Math.cos(deg2rad(car.front.rotation));
-	car.position.z = car.position.z + Math.sin(deg2rad(car.front.rotation));
 	
 	if (check){
-		// console.log("car pos:", car.position.x,",",car.position.z);
-		// draw scene
+		car.position.x = car.position.x + Math.cos(deg2rad(car.front.rotation));
+		car.position.z = car.position.z + Math.sin(deg2rad(car.front.rotation));
 		draw(gl, u_ModelMatrix, u_NormalMatrix, u_isLighting);
 	}
-}
-
-function deg2rad(angle){
-	// convert degree to radian
-	return angle * Math.PI / 180;
 }
 
 function initialiseColouredCubeVertexBuffer(gl, colours) {
@@ -411,8 +385,8 @@ function draw(gl, u_ModelMatrix, u_NormalMatrix, u_isLighting) {
 		// deal with default rotation
 
 		matrices.model.setTranslate(car.position.x, 0, car.position.z); // Translation (No translation is supported here)
-		// matrices.model.rotate(g_yAngle, 0, 1, 0); // Rotate along y axis
-		// matrices.model.rotate(g_xAngle, 1, 0, 0); // Rotate along x axis
+		// matrices.model.rotate(camera.view.y, 0, 1, 0); // Rotate along y axis
+		// matrices.model.rotate(camera.view.x, 1, 0, 0); // Rotate along x axis
 		matrices.model.rotate(car.front.rotation, 0.0, -1.0, 0.0); 
 		matrices.model.translate(0, 0.5, 0); // Translation
 		matrices.model.rotate(90, 0.0, 1.0, 0.0); 
@@ -522,6 +496,43 @@ function drawbox(gl, modelmatrix, normalmatrix, n) {
 	gl.drawElements(gl.TRIANGLES, n, gl.UNSIGNED_BYTE, 0);
 
 	matrices.model = popMatrix();
+}
+
+
+// 
+// 
+//  Assistive Functions
+// 
+// 
+
+function deg2rad(angle){
+	// convert degree to radian
+	return angle * Math.PI / 180;
+}
+
+function initUniformAttributes(){
+	u.ModelMatrix = gl.getUniformLocation(gl.program, 'u_ModelMatrix');
+	u.ViewMatrix = gl.getUniformLocation(gl.program, 'u_ViewMatrix');
+	u.NormalMatrix = gl.getUniformLocation(gl.program, 'u_NormalMatrix');
+	u.ProjMatrix = gl.getUniformLocation(gl.program, 'u_ProjMatrix');
+	u.LightColor = gl.getUniformLocation(gl.program, 'u_LightColor');
+	u.LightDirection = gl.getUniformLocation(gl.program, 'u_LightDirection');
+
+	// !point light implementation
+	u.LightPosition = gl.getUniformLocation(gl.program, 'u_LightPosition');
+	u.AmbientLight = gl.getUniformLocation(gl.program, 'u_AmbientLight');
+
+	// Trigger using lighting or not
+	u.isLighting = gl.getUniformLocation(gl.program, 'u_isLighting');
+}
+
+function initialiseColors(){
+	// Set clear color and enable hidden surface removal
+	gl.clearColor(settings.bg_color[0],settings.bg_color[1],settings.bg_color[2],settings.bg_color[3]);
+	gl.enable(gl.DEPTH_TEST);
+
+	// Clear color and depth buffer
+	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 }
 
 function checkStatus( u_LightPosition, u_ModelMatrix, u_ViewMatrix, u_NormalMatrix,u_ProjMatrix, u_LightColor, u_LightDirection,u_isLighting){
