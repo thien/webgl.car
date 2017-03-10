@@ -102,7 +102,7 @@ var u = { // storage locations of uniform attributes
 var settings = {
 	bg_color : [0.2,1,0.2,0.7],
 	light_color : [1,1,1],
-	light_direction : [7,7,7.0],
+	light_direction : [1,1,1],
 	light_position : [0,1,0],
 	ambient_light : [0.3, 0.5, 0.7]
 };
@@ -112,8 +112,6 @@ var canvas = document.getElementById('webgl');
 
 // Get the rendering context for WebGL
 var gl = getWebGLContext(canvas);
-
-var keys = [];
 
 function initialise() {
 	if (!gl) {
@@ -183,67 +181,52 @@ function initialise() {
 	gl.uniformMatrix4fv(u.ViewMatrix, false, matrices.view.elements);
 	gl.uniformMatrix4fv(u.ProjMatrix, false, matrices.projection.elements);
 
-	// deal with car movements
-
-	document.onkeydown = function(e){
-		keys.push(e.keyCode);
-	};
-
 	// draw the first screen.
-	draw(gl, u.ModelMatrix, u.NormalMatrix, u.isLighting);
+	draw(gl, u);
 
 	// loop the drawing
-	gameLoop();
+	// gameLoop();
 }
 
-var keyPressed = {};
-
-document.addEventListener('keydown', function(e) {
-   keyPressed[e.keyCode] = true;
-}, false);
-document.addEventListener('keyup', function(e) {
-   keyPressed[e.keyCode] = false;
-}, false);
-
-function gameLoop() {
-    while (keys.length > 0){
-		keydowns(keys.shift(), gl, u.ModelMatrix, u.NormalMatrix, u.isLighting);
+setInterval(function() {
+	while (keys.length > 0){
+		keyaction(keys.shift());
 	}
-   setTimeout(gameLoop, 5);
-}
+	draw(gl, u);
+}, 1);
 
-var goodkeys = {
-	'down' : [40, 83],
-	'up' : [38, 87],
-	'right': [39, 68],
-	'left' : [37, 65]
+var keys = [];
+
+// deal with car movements
+document.onkeydown = function(e){
+	keys.push(e.keyCode);
 };
 
-function keydowns(keycode, gl, u_ModelMatrix, u_NormalMatrix, u_isLighting) {
-	var check = false;
 
-	if (goodkeys.up.indexOf(keycode) != -1){
-		check = true;
+var goodkeys = {
+	'down' : 83,
+	'right': 68,
+	'up' : 87,
+	'left' : 65
+};
+
+function keyaction(keycode) {
+
+	if (keycode == goodkeys.up){
 		car.speed = car.speed  + 1;
 	}
-	if (goodkeys.down.indexOf(keycode) != -1){
-		check = true;
+	if (keycode == goodkeys.down){
 		car.speed = car.speed  - 1;
 	}
-	if (goodkeys.right.indexOf(keycode) != -1){
-		check = true;
+	if (keycode == goodkeys.right){
 		car.front.rotation = (car.front.rotation + car.anglestep % 360);
 	} 
-	if (goodkeys.left.indexOf(keycode) != -1){
-		check = true;
+	if (keycode == goodkeys.left){
 		car.front.rotation = (car.front.rotation - car.anglestep % 360);
 	}
-	
-	if (check){
-		car.position.x = car.position.x + Math.cos(deg2rad(car.front.rotation));
-		car.position.z = car.position.z + Math.sin(deg2rad(car.front.rotation));
-		draw(gl, u_ModelMatrix, u_NormalMatrix, u_isLighting);
-	}
+	// change position of car
+	car.position.x = car.position.x + Math.cos(deg2rad(car.front.rotation));
+	car.position.z = car.position.z + Math.sin(deg2rad(car.front.rotation));
 }
 
 function initialiseColouredCubeVertexBuffer(gl, colours) {
@@ -355,14 +338,14 @@ function popMatrix() {
 	return g_matrixStack.pop();
 }
 
-function draw(gl, u_ModelMatrix, u_NormalMatrix, u_isLighting) {
+function draw(gl, u) {
 
 	// Clear color and depth buffer
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 	// Pass the model matrix to the uniform variable
-	gl.uniformMatrix4fv(u_ModelMatrix, false, matrices.model.elements);
+	gl.uniformMatrix4fv(u.ModelMatrix, false, matrices.model.elements);
 	// apply lighting
-	gl.uniform1i(u_isLighting, true);
+	gl.uniform1i(u.isLighting, true);
 
 	// Set the vertex coordinates and color (for the cube)
 	matrices.model.setTranslate(0, 0, 0);
@@ -377,7 +360,7 @@ function draw(gl, u_ModelMatrix, u_NormalMatrix, u_isLighting) {
 		pushMatrix(matrices.model);
 		matrices.model.translate(0, -0.5, 0); // Translation
 		matrices.model.scale(plane.x,0,plane.z); // Scale
-		drawbox(gl, u_ModelMatrix, u_NormalMatrix, n);
+		drawbox(gl, u.ModelMatrix, u.NormalMatrix, n);
 		matrices.model = popMatrix();
 	}
 
@@ -400,7 +383,7 @@ function draw(gl, u_ModelMatrix, u_NormalMatrix, u_isLighting) {
 		matrices.model.scale(2.2, 1.2, 5); // Scale
 		car.forward_vector = [matrices.g_normal.elements[12], -matrices.g_normal.elements[14]];
 		// console.log("forward vector", car.forward_vector);
-		drawbox(gl, u_ModelMatrix, u_NormalMatrix, n);
+		drawbox(gl, u.ModelMatrix, u.NormalMatrix, n);
 		matrices.model = popMatrix();
 
 		// set car top colour
@@ -410,7 +393,7 @@ function draw(gl, u_ModelMatrix, u_NormalMatrix, u_isLighting) {
 		pushMatrix(matrices.model);
 		matrices.model.translate(0, 1, -0.5); // Translation
 		matrices.model.scale(2.0, 1, 4); // Scale
-		drawbox(gl, u_ModelMatrix, u_NormalMatrix, n);
+		drawbox(gl, u.ModelMatrix, u.NormalMatrix, n);
 		matrices.model = popMatrix();
 
 		// set door base colour
@@ -420,7 +403,7 @@ function draw(gl, u_ModelMatrix, u_NormalMatrix, u_isLighting) {
 		pushMatrix(matrices.model);
 		matrices.model.translate(1.1, 0.5, 0); // Translation
 		matrices.model.scale(0.1, 1.1, 1); // Scale
-		drawbox(gl, u_ModelMatrix, u_NormalMatrix, n);
+		drawbox(gl, u.ModelMatrix, u.NormalMatrix, n);
 		matrices.model = popMatrix();
 
 		// set car base colour
@@ -430,7 +413,7 @@ function draw(gl, u_ModelMatrix, u_NormalMatrix, u_isLighting) {
 		pushMatrix(matrices.model);
 		matrices.model.translate(-1.1, 0.5, 0); // Translation
 		matrices.model.scale(0.1, 1.1, 1); // Scale
-		drawbox(gl, u_ModelMatrix, u_NormalMatrix, n);
+		drawbox(gl, u.ModelMatrix, u.NormalMatrix, n);
 		matrices.model = popMatrix();
 
 
@@ -444,7 +427,7 @@ function draw(gl, u_ModelMatrix, u_NormalMatrix, u_isLighting) {
 		matrices.model.rotate(car.wheel.angle, 1.0, 0.0, 0.0); 
 		matrices.model.scale(0.2, 1, 1); // Scale
 		var bf_normal = [matrices.g_normal.elements[0], matrices.g_normal.elements[2]];
-		drawbox(gl, u_ModelMatrix, u_NormalMatrix, n);
+		drawbox(gl, u.ModelMatrix, u.NormalMatrix, n);
 		matrices.model = popMatrix();
 
 		//Model the car wheel (back right)
@@ -453,7 +436,7 @@ function draw(gl, u_ModelMatrix, u_NormalMatrix, u_isLighting) {
 		matrices.model.rotate(car.wheel.angle, 1.0, 0.0, 0.0); 
 		matrices.model.scale(0.2, 1, 1); // Scale
 		var br_normal = [matrices.g_normal.elements[0], matrices.g_normal.elements[2]];
-		drawbox(gl, u_ModelMatrix, u_NormalMatrix, n);
+		drawbox(gl, u.ModelMatrix, u.NormalMatrix, n);
 		matrices.model = popMatrix();
 
 		// set car base colour
@@ -466,7 +449,7 @@ function draw(gl, u_ModelMatrix, u_NormalMatrix, u_isLighting) {
 		matrices.model.rotate(car.wheel.angle, 1.0, 0.0, 0.0); 
 		matrices.model.scale(0.2, 1, 1); // Scale
 		var fl_normal = [matrices.g_normal.elements[0], matrices.g_normal.elements[2]];
-		drawbox(gl, u_ModelMatrix, u_NormalMatrix, n);
+		drawbox(gl, u.ModelMatrix, u.NormalMatrix, n);
 		matrices.model = popMatrix();
 
 		//Model the car wheel (front right)
@@ -476,7 +459,7 @@ function draw(gl, u_ModelMatrix, u_NormalMatrix, u_isLighting) {
 		matrices.model.rotate(car.front.rotation, 0.0, 1.0, 0.0); 
 		matrices.model.rotate(car.wheel.angle, 1.0, 0.0, 0.0); 
 		var fr_normal = [matrices.g_normal.elements[0], matrices.g_normal.elements[2]];
-		drawbox(gl, u_ModelMatrix, u_NormalMatrix, n);
+		drawbox(gl, u.ModelMatrix, u.NormalMatrix, n);
 		matrices.model = popMatrix();
 	}
 }
