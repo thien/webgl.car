@@ -4,25 +4,41 @@
     <meta charset="utf-8" />
     <title>Car</title>
     <style>
-        * { margin:0; padding:0; } /* to remove the top and left whitespace */
-
-          canvas { 
-        /*height: 100vh; */
-        width: 100vw; 
-        display: block;
-      }
+    body {
+      background-color: #ccc;
+    }
+    * {
+    /*padding: 10px 0px 0px 0px;*/
+    text-align: center;
+    margin: auto;
+    }
+    .Aligner {
+    margin: auto;
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    }
+    canvas {
+    /*height: 100vh; */
+    width: 100%;
+    margin: auto;
+    /*display: block;*/
+    }
     </style>
   </head>
+  <body>
+      <pre>WASD to move, Space to Toggle Doors</pre>
+    <div class="Aligner">
+        <canvas id="webgl" width="2000px" height="1400px">
+        Please use a browser that supports "canvas"
+        </canvas>
 
-  <body onload="main()">
-    <canvas id="webgl" width="1280px" height="1280px">
-    Please use a browser that supports "canvas"
-    </canvas>
-
-    <script src="../lib/webgl-utils.js"></script>
-    <script src="../lib/webgl-debug.js"></script>
-    <script src="../lib/cuon-utils.js"></script>
-    <script src="../lib/cuon-matrix.js"></script>
-    <script src="./car.js"></script>
+    </div>
   </body>
+  <script src="../lib/webgl-utils.js"></script>
+  <script src="../lib/webgl-debug.js"></script>
+  <script src="../lib/cuon-utils.js"></script>
+  <script src="../lib/cuon-matrix.js"></script>
+  <script src="./car.js"></script>
+  <script>initialise();</script>
 </html>
