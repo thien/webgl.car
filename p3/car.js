@@ -1,16 +1,20 @@
+// Retrieve <canvas> element
+var canvas = document.getElementById('webgl');
+
 var vertex_shader_source =
 	'attribute vec4 a_Position;\n' +
 	'attribute vec4 a_Color;\n' +
-	'attribute vec4 a_Normal;\n' + // Normal
+	'attribute vec4 a_Normal;\n' +	 // Normal
 	'uniform mat4 u_ModelMatrix;\n' +
 	'uniform mat4 u_NormalMatrix;\n' +
 	'uniform mat4 u_ViewMatrix;\n' +
-	'uniform vec3 u_AmbientLight;\n' + // Ambient Light
 	'uniform mat4 u_ProjMatrix;\n' +
 	'uniform vec3 u_LightColor;\n' + // Light color
-	'uniform vec3 u_LightPosition;\n' + // Light Position
 	'uniform vec3 u_LightDirection;\n' + // Light direction (in the world coordinate, normalized)
+	'uniform vec3 u_AmbientLight;\n' + // Ambient Light
+	'uniform vec3 u_LightPosition;\n' + // Light Position
 	'varying vec4 v_Color;\n' +
+	'varying vec3 v_Normal;\n' +
 	'uniform bool u_isLighting;\n' +
 	'void main() {\n' +
 	'  gl_Position = u_ProjMatrix * u_ViewMatrix * u_ModelMatrix * a_Position;\n' +
@@ -23,18 +27,14 @@ var vertex_shader_source =
 
 	// // //  make length of normal 1.0
 	'     vec3 normal = normalize((u_NormalMatrix * a_Normal).xyz);\n' +
-
 	// // // dot product of light direction/ orientation of surface
 	'     float nDotL = max(dot(lightDirection, normal), 0.0);\n' +
-
 	// // // Calculate the color due to diffuse reflection
 	'     vec3 diffuse = u_LightColor * a_Color.rgb * nDotL;\n' +
-
 	// // calculate the colour due to ambient reflection
 	'     vec3 ambient = u_AmbientLight * a_Color.rgb;\n' +
 	// // add surface colors due to diffuse and ambient reflection
 	'     v_Color = vec4(diffuse + ambient, a_Color.a); \n' +
-
 	'  }\n' +
 	'  else\n' +
 	'  {\n' +
@@ -44,27 +44,42 @@ var vertex_shader_source =
 
 var fragment_shader_source =
 	'#ifdef GL_ES\n' +
-	'precision mediump float;\n' +
+	'precision highp float;\n' +
 	'#endif\n' +
+
+	'uniform vec3 u_LightPosition;\n' +
+	'uniform vec3 vertexPosition;\n' +
+	'uniform vec3 u_AmbientLight;\n' + // Ambient Light
+	'uniform vec3 u_LightColor;\n' + // Light color
+	'uniform vec3 v_Normal;\n' +
 	'varying vec4 v_Color;\n' +
 	'void main() {\n' +
-	'  gl_FragColor = v_Color;\n' +
-	'}\n'; // Fragment shader program
 
-var matrices = {
-	'model' : new Matrix4(),		// The model matrix
-	'view' : new Matrix4(),			// The view matrix
-	'projection' : new Matrix4(),	// The projection matrix
-	'g_normal' : new Matrix4()		// Coordinate transformation matrix for normals
-};
+
+		' gl_FragColor = v_Color;\n' +
+			// Normalize normal because it's interpolated and not 1.0 (length)
+		' vec3 normal = normalize(v_Normal);\n' +
+		 // Calculate the light direction and make it 1.0 in length
+		' vec3 lightDirection = normalize(u_LightPosition - vertexPosition);\n' +
+		// The dot product of the light direction and the normal
+		' float nDotL = max(dot( lightDirection, normal), 0.0);\n' +
+		// Calculate the final color from diffuse and ambient reflection
+		' vec3 diffuse = u_LightColor * v_Color.rgb * nDotL;\n' +
+		' vec3 ambient = u_AmbientLight * v_Color.rgb;\n' +
+		' gl_FragColor = vec4(diffuse + ambient, v_Color.a);\n' +
+
+
+	'}\n'; // Fragment shader program
 
 var car = {
 	'enabled' : true,
+	'velocity' : 0.001,
+	'throttle' : 0.05,
+	'drag' : 0.04,
 	'position' : {
 		'x' : 0,
 		'z' : 0
 	},
-	'speed' : 1,
 	'wheel' : {
 		'angle' : 0,
 		'step' : 0,
@@ -78,40 +93,87 @@ var car = {
 };
 
 var plane = {
-	'x' : 50,
-	'z' : 50,
-	'enabled': true
+	'x' : 80,
+	'z' : 80,
+	'enabled': true,
+	'colour' : [1,1,1]
 };
 
 var camera = {
 	'view' : {
 		'x' : 0, // The rotation x angle (degrees)
 		'y' : 0  // The rotation y angle (degrees)
+	},
+	'world_view' : {
+		'setLookat': [
+		-45,  45, -45, 
+		  0, -10,   0, 
+		  0,   1,   0
+		],
+		'setPerspective' : [
+			40, 
+			canvas.width / canvas.height, 
+			1, 
+			120
+		],
+	},
+	'follow_car' : {
+		'setLookat' : [
+		car.position.x, 25, 50, car.position.x, 0, car.position.z, 0, 1, -10],
+		'setPerspective' : [
+			40, 
+			canvas.width / canvas.height, 
+			1, 
+			120
+		],
 	}
 };
 
-var u = { // storage locations of uniform attributes
-	ModelMatrix : 0,
-	ViewMatrix : 0,
-	NormalMatrix : 0,
-	ProjMatrix : 0,
-	LightColour : 0, 
-	LightDirection : 0
-};
-
 var settings = {
+	cameraview : camera.follow_car,
 	bg_color : [0.2,1,0.2,0.7],
-	light_color : [1,1,1],
-	light_direction : [1,1,1],
-	light_position : [0,1,0],
-	ambient_light : [0.3, 0.5, 0.7]
+	light_color : [1.0,1.0,1.0],
+	light_direction : [0.5, 3.0, 4.0],
+	light_position : [0.0,1.0,0.0],
+	ambient_light : [0.1,0.1,0.1],
 };
 
-// Retrieve <canvas> element
-var canvas = document.getElementById('webgl');
+var stores = {
+	u : { // storage locations of uniform attributes
+		ModelMatrix : 0,
+		ViewMatrix : 0,
+		NormalMatrix : 0,
+		ProjMatrix : 0,
+		LightColour : 0, 
+		LightDirection : 0
+	},
+	matrices : {
+		'model' : new Matrix4(),		// The model matrix
+		'view' : new Matrix4(),			// The view matrix
+		'projection' : new Matrix4(),	// The projection matrix
+		'g_normal' : new Matrix4()		// Coordinate transformation matrix for normals
+	}
+}
+
+var keypresses = {};
 
 // Get the rendering context for WebGL
 var gl = getWebGLContext(canvas);
+
+function initUniformAttributes(){
+	stores.u.ModelMatrix = 		gl.getUniformLocation(gl.program, 'u_ModelMatrix');
+	stores.u.ViewMatrix =		gl.getUniformLocation(gl.program, 'u_ViewMatrix');
+	stores.u.NormalMatrix = 	gl.getUniformLocation(gl.program, 'u_NormalMatrix');
+	stores.u.ProjMatrix = 		gl.getUniformLocation(gl.program, 'u_ProjMatrix');
+	stores.u.LightColor = 		gl.getUniformLocation(gl.program, 'u_LightColor');
+	stores.u.LightDirection = 	gl.getUniformLocation(gl.program, 'u_LightDirection');
+	// !point light implementation
+	stores.u.LightPosition = 	gl.getUniformLocation(gl.program, 'u_LightPosition');
+	stores.u.AmbientLight = 	gl.getUniformLocation(gl.program, 'u_AmbientLight');
+	// Trigger using lighting or not
+	stores.u.isLighting = 		gl.getUniformLocation(gl.program, 'u_isLighting'); 
+
+}
 
 function initialise() {
 	if (!gl) {
@@ -129,104 +191,161 @@ function initialise() {
 	// deal with storage locations of the uniform attributes
 	initUniformAttributes();
 
-	// check Status of items to see whether they have initiated.
-	checkStatus(u.ModelMatrix, u.ViewMatrix, u.NormalMatrix,u.ProjMatrix, u.LightColor, u.LightDirection,u.isLighting);
-
-	// Set the light color (white)
-	gl.uniform3f(u.LightColor, settings.light_color[0], settings.light_color[1], settings.light_color[2]);
-
-	// Set the light direction (in the world coordinate)
-	var lightDirection = new Vector3(settings.light_direction);
-
-	// Normalize the light direction
-	lightDirection.normalize();
-	gl.uniform3fv(u.LightDirection, lightDirection.elements);
-
-	// Set the light direction (in the world coordinate)
-	var lightPosition = new Vector3(settings.light_position);
-	gl.uniform3fv(u.LightPosition, lightPosition.elements);
+	// Set the light position (in the world coordinate)
+	gl.uniform3fv(stores.u.LightPosition, new Vector3(settings.light_position).elements);
 
 	// set up ambient light
-	// Set the light direction (in the world coordinate)
-	var AmbientLight = new Vector3(settings.ambient_light);
+	var AmbientLight = new Vector3(settings.ambient_light).normalize();
+	gl.uniform3fv(stores.u.AmbientLight, AmbientLight.elements);
 
-	// Normalize the light direction
-	AmbientLight.normalize();
-	gl.uniform3fv(u.AmbientLight, AmbientLight.elements);
+	// Set the light color
+	var LightColor = new Vector3(settings.light_color);
+	gl.uniform3fv(stores.u.LightColor, LightColor.elements);
 
-	// Calculate the view matrix and the projection matrix
+	// set up light direction (in world coord)
+	gl.uniform3f(stores.u.LightDirection, new Vector3(settings.light_direction).normalize().elements);
 
-	  // calculate the view matrix and projection matrix
-	  // matrices.view.setLookAt(0, 0, 5, 0, 0, 0, 0, 1, 0);
-	  // angle (x), angle (y), zoom,  _____, _, rotation of camera, inv,
+	// apply lighting
+	gl.uniform1i(stores.u.isLighting, true);
 
-
-	  // sets of three (x,y,z)
-	  // pos cam, pos along dierction you wanna look at, up axis,
-
-	// angled position
-	matrices.view.setLookAt(
-		-45, 45, -45, 
-		0,  -10, 0, 
-		0, 	1, 	 0
+	check Status of items to see whether they have initiated.
+	checkStatus(
+		stores.u.ModelMatrix, 
+		stores.u.ViewMatrix, 
+		stores.u.NormalMatrix,
+		stores.u.ProjMatrix, 
+		stores.u.LightColor, 
+		stores.u.LightDirection,
+		stores.u.isLighting
 	);
 
-  	// matrices.view.setLookAt(20, 2, 10, -10, -15, 0, 0.0, 0.02, 0);
+	// if (!stores.u.ModelMatrix) {
+	// 	console.log("model matrix msising");
+	// } else {
+	// 	// console.log("modelmatrix", modelmatrix);
+	// }
+	// if (!stores.u.ViewMatrix) {
+	// 	console.log("view matrix msising");
+	// } else {
+	// 	// console.log("viewmatrix", viewmat)
+	// }
+	// if (!stores.u.NormalMatrix) {
+	// 	console.log("normal matrix msising");
+	// }
+	// if (!stores.u.ProjMatrix) {
+	// 	console.log("proj matrix msising");
+	// }
+	// if (!stores.u.LightColor) {
+	// 	console.log("light colour missing");
+	// 	console.log(lightcol)
+	// }
+	// if (!stores.u.LightDirection) {
+	// 	console.log("light direction missing?");
+	// }
+	// if (!stores.u.isLighting) {
+	// 	console.log("light boolean missing");
+	// 	console.log(light);
+	// }
 
-	// matrices.view.setLookAt(0, 0, 15, 0, 0, -100, 0, 1, 0);
+	var sl = settings.cameraview.setLookat;
+	stores.matrices.view.setLookAt(sl[0],sl[1],sl[2],sl[3],sl[4],sl[5],sl[6],sl[7],sl[8]);
 
-	matrices.projection.setPerspective(40, canvas.width / canvas.height, 1, 120);
+	var sp = settings.cameraview.setPerspective;
+	stores.matrices.projection.setPerspective(sp[0], sp[1], sp[2], sp[3]);
 
 	// Pass the model, view, and projection matrix to the uniform variable respectively
-	gl.uniformMatrix4fv(u.ViewMatrix, false, matrices.view.elements);
-	gl.uniformMatrix4fv(u.ProjMatrix, false, matrices.projection.elements);
+	gl.uniformMatrix4fv(stores.u.ViewMatrix, false, stores.matrices.view.elements);
+	gl.uniformMatrix4fv(stores.u.ProjMatrix, false, stores.matrices.projection.elements);
 
 	// draw the first screen.
-	draw(gl, u);
-
-	// loop the drawing
-	// gameLoop();
+	draw(gl, stores.u);
+	// draw following screens
+	setInterval(function() {
+		tick(gl, stores.u);
+	}, 17) //60fps
 }
 
-setInterval(function() {
-	while (keys.length > 0){
-		keyaction(keys.shift());
+document.onkeydown = function(ev){
+	keypresses[ev.keyCode] = true;
+	// Toggle keys go here...
+	switch(ev.keyCode) {
+		case 32: // Spacebar 
+			g_doorOpen = !g_doorOpen;
+			break;
+		// case 67: // "c" 
+		// 	if (g_cameraMode < g_cameraModes.length-1) {
+		// 		g_cameraMode += 1;
+		// 	} else {
+		// 		g_cameraMode = 0;
+		// 	}
+		// 	break;
+		// case 76: // "l"
+		// 	if (g_lightingMode < g_lightingModes.length-1) {
+		// 		g_lightingMode += 1;
+		// 	} else {
+		// 		g_lightingMode = 0;
+		// 	}
+		// 	break;
 	}
-	draw(gl, u);
-}, 1);
-
-var keys = [];
-
-// deal with car movements
-document.onkeydown = function(e){
-	keys.push(e.keyCode);
 };
 
+document.onkeyup = function(ev){
+	// remove it from the list
+	keypresses[ev.keyCode] = false;
+};
+
+function tick(gl, u) {
+	for (var keycode in keypresses) {
+		if (keypresses[keycode]) {
+			keydown(keycode);
+		}
+	}
+	if (car.velocity > 0) {
+		car.velocity -= car.drag;
+	} else if (car.velocity < 0) {
+		car.velocity += car.drag;
+	}
+	
+	// deal with wheel rotation
+	car.wheel.angle += car.velocity*100;
+
+	// change position of car
+	car.position.x += car.velocity * Math.cos(deg2rad(car.front.rotation));
+	car.position.z += car.velocity * Math.sin(deg2rad(car.front.rotation));
+
+	if (Math.abs(car.position.x) >= Math.abs(plane.x/2) || Math.abs(car.position.z) >= Math.abs(plane.z/2)){
+		// bounce back from the wall.
+		car.front.rotation = (car.front.rotation - 180) % 360;
+	}
+
+	draw(gl, u);
+}
 
 var goodkeys = {
-	'down' : 83,
+	// keys are wasd
+	'down' : 83, 
 	'right': 68,
 	'up' : 87,
 	'left' : 65
 };
 
-function keyaction(keycode) {
-
-	if (keycode == goodkeys.up){
-		car.speed = car.speed  + 1;
+function keydown(keycode) {
+	switch (parseInt(keycode)) {
+		case goodkeys.down:
+			car.velocity -= car.throttle;
+			break;
+		case goodkeys.up:
+			car.velocity += car.throttle;
+			break;
+		case goodkeys.right:
+			car.front.rotation = (car.front.rotation + car.anglestep % 360);
+		  break;
+		case goodkeys.left:
+			car.front.rotation = (car.front.rotation - car.anglestep % 360);
+			break;
+		 // Skip drawing
+		default: return;
 	}
-	if (keycode == goodkeys.down){
-		car.speed = car.speed  - 1;
-	}
-	if (keycode == goodkeys.right){
-		car.front.rotation = (car.front.rotation + car.anglestep % 360);
-	} 
-	if (keycode == goodkeys.left){
-		car.front.rotation = (car.front.rotation - car.anglestep % 360);
-	}
-	// change position of car
-	car.position.x = car.position.x + Math.cos(deg2rad(car.front.rotation));
-	car.position.z = car.position.z + Math.sin(deg2rad(car.front.rotation));
 }
 
 function initialiseColouredCubeVertexBuffer(gl, colours) {
@@ -299,6 +418,19 @@ function initialiseColouredCubeVertexBuffer(gl, colours) {
 	return cube.indices.length;
 }
 
+function manipulateColourBuffer(gl, colour){
+	var col = new Float32Array(72);
+	for (i = 0; i < col.length; i = i + 3){
+		col[i] = colour[0];
+		col[i+1] = colour[1];
+		col[i+2] = colour[2];
+	}
+
+	if (!initialiseArrayBuffer(gl, 'a_Color', col, 3, gl.FLOAT)) {
+		return -1;
+	}
+}
+
 function initialiseArrayBuffer(gl, attribute, data, num, type) {
 	// Create a buffer object
 	var buffer = gl.createBuffer();
@@ -325,31 +457,36 @@ function initialiseArrayBuffer(gl, attribute, data, num, type) {
 }
 
 // Array for storing a matrix
-var g_matrixStack = [];
+var g_matrixstack = [];
 
 function pushMatrix(m) {
 	// Store the specified matrix to the array
 	var m2 = new Matrix4(m);
-	g_matrixStack.push(m2);
+	g_matrixstack.push(m2);
 }
 
 function popMatrix() {
 	// Retrieve the matrix from the array
-	return g_matrixStack.pop();
+	return g_matrixstack.pop();
+}
+
+function initiateDrawFunctions(gl){
+	// Clear color and depth buffer
+	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+	// Pass the model matrix to the uniform variable
+	gl.uniformMatrix4fv(stores.u.ModelMatrix, false, stores.matrices.model.elements);
+	return gl;
 }
 
 function draw(gl, u) {
 
-	// Clear color and depth buffer
-	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-	// Pass the model matrix to the uniform variable
-	gl.uniformMatrix4fv(u.ModelMatrix, false, matrices.model.elements);
-	// apply lighting
-	gl.uniform1i(u.isLighting, true);
+	gl = initiateDrawFunctions(gl);
 
 	// Set the vertex coordinates and color (for the cube)
-	matrices.model.setTranslate(0, 0, 0);
-	var n = initialiseColouredCubeVertexBuffer(gl, [0.1,0.1,0.1]);
+	stores.matrices.model.setTranslate(0, 0, 0);
+
+	// initiate cube vertex
+	var n = initialiseColouredCubeVertexBuffer(gl, plane.colour);
 
 	if (n < 0) {
 		console.log('Failed to set the vertex information');
@@ -357,128 +494,118 @@ function draw(gl, u) {
 	}
 
 	if (plane.enabled){
-		pushMatrix(matrices.model);
-		matrices.model.translate(0, -0.5, 0); // Translation
-		matrices.model.scale(plane.x,0,plane.z); // Scale
-		drawbox(gl, u.ModelMatrix, u.NormalMatrix, n);
-		matrices.model = popMatrix();
+		pushMatrix(stores.matrices.model);
+		stores.matrices.model.translate(0, -0.5, 0); // Translation
+		stores.matrices.model.scale(plane.x,0,plane.z); // Scale
+		drawbox(gl, stores.u.ModelMatrix, stores.u.NormalMatrix, n);
+		stores.matrices.model = popMatrix();
 	}
 
 	if (car.enabled){
 		// deal with default rotation
 
-		matrices.model.setTranslate(car.position.x, 0, car.position.z); // Translation (No translation is supported here)
-		// matrices.model.rotate(camera.view.y, 0, 1, 0); // Rotate along y axis
-		// matrices.model.rotate(camera.view.x, 1, 0, 0); // Rotate along x axis
-		matrices.model.rotate(car.front.rotation, 0.0, -1.0, 0.0); 
-		matrices.model.translate(0, 0.5, 0); // Translation
-		matrices.model.rotate(90, 0.0, 1.0, 0.0); 
+		stores.matrices.model.setTranslate(car.position.x, 0, car.position.z); // Translation (No translation is supported here)
+		// stores.matrices.model.rotate(camera.view.y, 0, 1, 0); // Rotate along y axis
+		// stores.matrices.model.rotate(camera.view.x, 1, 0, 0); // Rotate along x axis
+		stores.matrices.model.rotate(car.front.rotation, 0.0, -1.0, 0.0); 
+		stores.matrices.model.translate(0, 0.5, 0); // Translation
+		stores.matrices.model.rotate(90, 0.0, 1.0, 0.0); 
 
 		// set car base colour
-		n = initialiseColouredCubeVertexBuffer(gl, [0.25,0.25,0.25]);
+		manipulateColourBuffer(gl, [0.25,0.25,0.25]);
 
 		// Model the car base
-		pushMatrix(matrices.model);
-		matrices.model.translate(0, 0, 0.2); // Translation
-		matrices.model.scale(2.2, 1.2, 5); // Scale
-		car.forward_vector = [matrices.g_normal.elements[12], -matrices.g_normal.elements[14]];
-		// console.log("forward vector", car.forward_vector);
-		drawbox(gl, u.ModelMatrix, u.NormalMatrix, n);
-		matrices.model = popMatrix();
+		pushMatrix(stores.matrices.model);
+		stores.matrices.model.translate(0, 0, 0.2); // Translation
+		stores.matrices.model.scale(2.2, 1.2, 5); // Scale
+		drawbox(gl, stores.u.ModelMatrix, stores.u.NormalMatrix, n);
+		stores.matrices.model = popMatrix();
 
 		// set car top colour
-		n = initialiseColouredCubeVertexBuffer(gl, [0.6,0.6,0.6]);
+		manipulateColourBuffer(gl, [0.6,0.6,0.6]);
 
 		// Model the car top
-		pushMatrix(matrices.model);
-		matrices.model.translate(0, 1, -0.5); // Translation
-		matrices.model.scale(2.0, 1, 4); // Scale
-		drawbox(gl, u.ModelMatrix, u.NormalMatrix, n);
-		matrices.model = popMatrix();
+		pushMatrix(stores.matrices.model);
+		stores.matrices.model.translate(0, 1, -0.5); // Translation
+		stores.matrices.model.scale(2.0, 1, 4); // Scale
+		drawbox(gl, stores.u.ModelMatrix, stores.u.NormalMatrix, n);
+		stores.matrices.model = popMatrix();
 
 		// set door base colour
-		n = initialiseColouredCubeVertexBuffer(gl, [0.5,0.8,0.4]);
+		manipulateColourBuffer(gl, [0.5,0.8,0.4]);
 
 		// Model the car door (left)
-		pushMatrix(matrices.model);
-		matrices.model.translate(1.1, 0.5, 0); // Translation
-		matrices.model.scale(0.1, 1.1, 1); // Scale
-		drawbox(gl, u.ModelMatrix, u.NormalMatrix, n);
-		matrices.model = popMatrix();
+		pushMatrix(stores.matrices.model);
+		stores.matrices.model.translate(1.1, 0.5, 0); // Translation
+		stores.matrices.model.scale(0.1, 1.1, 1); // Scale
+		drawbox(gl, stores.u.ModelMatrix, stores.u.NormalMatrix, n);
+		stores.matrices.model = popMatrix();
 
 		// set car base colour
-		n = initialiseColouredCubeVertexBuffer(gl, [0.55,0.25,0.25]);
+		manipulateColourBuffer(gl, [0.55,0.25,0.25]);
 
 		// Model the car door (right)
-		pushMatrix(matrices.model);
-		matrices.model.translate(-1.1, 0.5, 0); // Translation
-		matrices.model.scale(0.1, 1.1, 1); // Scale
-		drawbox(gl, u.ModelMatrix, u.NormalMatrix, n);
-		matrices.model = popMatrix();
-
+		pushMatrix(stores.matrices.model);
+		stores.matrices.model.translate(-1.1, 0.5, 0); // Translation
+		stores.matrices.model.scale(0.1, 1.1, 1); // Scale
+		drawbox(gl, stores.u.ModelMatrix, stores.u.NormalMatrix, n);
+		stores.matrices.model = popMatrix();
 
 		// set car base colour
-		n = initialiseColouredCubeVertexBuffer(gl, [0.3,0.25,0.7]);
+		manipulateColourBuffer(gl, [0.3,0.25,0.7]);
 
 		//Model the car wheel (back left)
-		pushMatrix(matrices.model);
-		matrices.model.translate(-1.2, -0.5, -1.5); // Translation
-		// matrices.model.rotate(car.front.rotation, 0.0, 1.0, 0.0); 
-		matrices.model.rotate(car.wheel.angle, 1.0, 0.0, 0.0); 
-		matrices.model.scale(0.2, 1, 1); // Scale
-		var bf_normal = [matrices.g_normal.elements[0], matrices.g_normal.elements[2]];
-		drawbox(gl, u.ModelMatrix, u.NormalMatrix, n);
-		matrices.model = popMatrix();
+		pushMatrix(stores.matrices.model);
+		stores.matrices.model.translate(-1.2, -0.5, -1.5); // Translation
+		stores.matrices.model.rotate(car.wheel.angle, 1.0, 0.0, 0.0); 
+		stores.matrices.model.scale(0.2, 1, 1); // Scale
+		drawbox(gl, stores.u.ModelMatrix, stores.u.NormalMatrix, n);
+		stores.matrices.model = popMatrix();
 
 		//Model the car wheel (back right)
-		pushMatrix(matrices.model);
-		matrices.model.translate(1.2, -0.5, -1.5); // Translation
-		matrices.model.rotate(car.wheel.angle, 1.0, 0.0, 0.0); 
-		matrices.model.scale(0.2, 1, 1); // Scale
-		var br_normal = [matrices.g_normal.elements[0], matrices.g_normal.elements[2]];
-		drawbox(gl, u.ModelMatrix, u.NormalMatrix, n);
-		matrices.model = popMatrix();
+		pushMatrix(stores.matrices.model);
+		stores.matrices.model.translate(1.2, -0.5, -1.5); // Translation
+		stores.matrices.model.rotate(car.wheel.angle, 1.0, 0.0, 0.0); 
+		stores.matrices.model.scale(0.2, 1, 1); // Scale
+		drawbox(gl, stores.u.ModelMatrix, stores.u.NormalMatrix, n);
+		stores.matrices.model = popMatrix();
 
 		// set car base colour
-		n = initialiseColouredCubeVertexBuffer(gl, [0.6,0.2,0.55]);
+		manipulateColourBuffer(gl, [0.6,0.2,0.55]);
 
 		// Model the car wheel (front left)
-		pushMatrix(matrices.model);
-		matrices.model.translate(1.2, -0.5, 1.5); // Translation
-		matrices.model.rotate(car.front.rotation, 0.0, 1.0, 0.0); 
-		matrices.model.rotate(car.wheel.angle, 1.0, 0.0, 0.0); 
-		matrices.model.scale(0.2, 1, 1); // Scale
-		var fl_normal = [matrices.g_normal.elements[0], matrices.g_normal.elements[2]];
-		drawbox(gl, u.ModelMatrix, u.NormalMatrix, n);
-		matrices.model = popMatrix();
+		pushMatrix(stores.matrices.model);
+		stores.matrices.model.translate(1.2, -0.5, 1.5); // Translation
+		stores.matrices.model.rotate(car.wheel.angle, 1.0, 0.0, 0.0); 
+		stores.matrices.model.scale(0.2, 1, 1); // Scale
+		drawbox(gl, stores.u.ModelMatrix, stores.u.NormalMatrix, n);
+		stores.matrices.model = popMatrix();
 
 		//Model the car wheel (front right)
-		pushMatrix(matrices.model);
-		matrices.model.translate(-1.2, -0.5, 1.5); // Translation
-		matrices.model.scale(0.2, 1, 1); // Scale
-		matrices.model.rotate(car.front.rotation, 0.0, 1.0, 0.0); 
-		matrices.model.rotate(car.wheel.angle, 1.0, 0.0, 0.0); 
-		var fr_normal = [matrices.g_normal.elements[0], matrices.g_normal.elements[2]];
-		drawbox(gl, u.ModelMatrix, u.NormalMatrix, n);
-		matrices.model = popMatrix();
+		pushMatrix(stores.matrices.model);
+		stores.matrices.model.translate(-1.2, -0.5, 1.5); // Translation
+		stores.matrices.model.scale(0.2, 1, 1); // Scale
+		stores.matrices.model.rotate(car.wheel.angle, 1.0, 0.0, 0.0); 
+		drawbox(gl, stores.u.ModelMatrix, stores.u.NormalMatrix, n);
+		stores.matrices.model = popMatrix();
 	}
 }
 
 function drawbox(gl, modelmatrix, normalmatrix, n) {
-	pushMatrix(matrices.model);
+	pushMatrix(stores.matrices.model);
 
 	// Pass the model matrix to the uniform variable
-	gl.uniformMatrix4fv(modelmatrix, false, matrices.model.elements);
+	gl.uniformMatrix4fv(modelmatrix, false, stores.matrices.model.elements);
 
 	// Calculate the normal transformation matrix and pass it to normalmatrix
-	matrices.g_normal.setInverseOf(matrices.model);
-	matrices.g_normal.transpose();
-	gl.uniformMatrix4fv(normalmatrix, false, matrices.g_normal.elements);
+	stores.matrices.g_normal.setInverseOf(stores.matrices.model);
+	stores.matrices.g_normal.transpose();
+	gl.uniformMatrix4fv(normalmatrix, false, stores.matrices.g_normal.elements);
 
 	// Draw the cube
 	gl.drawElements(gl.TRIANGLES, n, gl.UNSIGNED_BYTE, 0);
 
-	matrices.model = popMatrix();
+	stores.matrices.model = popMatrix();
 }
 
 
@@ -493,22 +620,6 @@ function deg2rad(angle){
 	return angle * Math.PI / 180;
 }
 
-function initUniformAttributes(){
-	u.ModelMatrix = gl.getUniformLocation(gl.program, 'u_ModelMatrix');
-	u.ViewMatrix = gl.getUniformLocation(gl.program, 'u_ViewMatrix');
-	u.NormalMatrix = gl.getUniformLocation(gl.program, 'u_NormalMatrix');
-	u.ProjMatrix = gl.getUniformLocation(gl.program, 'u_ProjMatrix');
-	u.LightColor = gl.getUniformLocation(gl.program, 'u_LightColor');
-	u.LightDirection = gl.getUniformLocation(gl.program, 'u_LightDirection');
-
-	// !point light implementation
-	u.LightPosition = gl.getUniformLocation(gl.program, 'u_LightPosition');
-	u.AmbientLight = gl.getUniformLocation(gl.program, 'u_AmbientLight');
-
-	// Trigger using lighting or not
-	u.isLighting = gl.getUniformLocation(gl.program, 'u_isLighting');
-}
-
 function initialiseColors(){
 	// Set clear color and enable hidden surface removal
 	gl.clearColor(settings.bg_color[0],settings.bg_color[1],settings.bg_color[2],settings.bg_color[3]);
@@ -518,32 +629,37 @@ function initialiseColors(){
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 }
 
-function checkStatus( u_LightPosition, u_ModelMatrix, u_ViewMatrix, u_NormalMatrix,u_ProjMatrix, u_LightColor, u_LightDirection,u_isLighting){
-	if (!u_LightPosition) {
-		console.log("Failed to Get storage location of u_LightPosition");
+function checkStatus( lightpos, modelmatrix, viewmat, normal,proj, lightcol, lightdir,light){
+	if (!lightpos) {
+		console.log("Failed to Get storage location of light position");
+	} else {
+		// console.log("lightpos", lightpos);
 	}
-	if (!u_ModelMatrix) {
+	if (!modelmatrix) {
 		console.log("model matrix msising");
+	} else {
+		// console.log("modelmatrix", modelmatrix);
 	}
-	if (!u_ViewMatrix) {
+	if (!viewmat) {
 		console.log("view matrix msising");
+	} else {
+		// console.log("viewmatrix", viewmat)
 	}
-	if (!u_NormalMatrix) {
+	if (!normal) {
 		console.log("normal matrix msising");
 	}
-	if (!u_ProjMatrix) {
+	if (!proj) {
 		console.log("proj matrix msising");
 	}
-	if (!u_ProjMatrix) {
-		console.log("proj matrix msising");
+	if (!lightcol) {
+		console.log("light colour missing");
+		console.log(lightcol)
 	}
-	if (!u_LightColor) {
-		console.log("lighr col missing");
+	if (!lightdir) {
+		console.log("light direction missing?");
 	}
-	if (!u_LightDirection) {
-		console.log("light dir missing?");
-	}
-	if (!u_isLighting) {
-		console.log("is lighting missing");
+	if (!light) {
+		console.log("light boolean missing");
+		console.log(light);
 	}
 }
