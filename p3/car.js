@@ -102,7 +102,7 @@ var plane = {
 	'x' : 60,
 	'z' : 60,
 	'enabled': true,
-	'colour' : [0.1,0.1,0.1]
+	'colour' : [1,1,1]
 };
 var camera = {
 	'view' : {
@@ -138,7 +138,7 @@ var settings = {
 	bg_color : [0.2,0.9,0.5],
 	light_color : [1.0,1.0,1.0],
 	light_direction : [0.5, 3.0, 4.0],
-	light_position : [0.0,1.0,0.0],
+	light_position : [0.0,15.0,0.0],
 	ambient_light : [1,1,1],
 };
 var stores = {
@@ -446,7 +446,7 @@ function draw(gl, u) {
 		pushMatrix(stores.matrices.model);
 		manipulateColourBuffer(gl, plane.colour);
 		stores.matrices.model.translate(0, -0.5, 0); // Translation
-		stores.matrices.model.scale(plane.x,0,plane.z); // Scale
+		stores.matrices.model.scale(plane.x,0.1,plane.z); // Scale
 		drawbox(gl, stores.u.ModelMatrix, stores.u.NormalMatrix, n);
 		stores.matrices.model = popMatrix();
 	}
