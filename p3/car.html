@@ -5,7 +5,7 @@
     <title>Car</title>
     <style>
     body {
-      background-color: #ccc;
+      background-color: rgb(51, 230, 128);
     }
     * {
     /*padding: 10px 0px 0px 0px;*/
@@ -14,12 +14,13 @@
     }
     .Aligner {
     margin: auto;
-    height: 100vh;
     width: 100vw;
+    height: 80vh;
+    max-width: 800px;
     display: flex;
     }
     canvas {
-    /*height: 100vh; */
+    /*height: 0vh; */
     width: 100%;
     margin: auto;
     /*display: block;*/
@@ -27,12 +28,11 @@
     </style>
   </head>
   <body>
-      <pre>WASD to move, Space to Toggle Doors</pre>
+  <div><pre>WASD to move, Space to Toggle Doors, T to toggle lighting</pre></div>
     <div class="Aligner">
         <canvas id="webgl" width="2000px" height="1400px">
         Please use a browser that supports "canvas"
         </canvas>
-
     </div>
   </body>
   <script src="../lib/webgl-utils.js"></script>
