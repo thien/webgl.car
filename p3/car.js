@@ -1,20 +1,20 @@
 var canvas = document.getElementById('webgl'); // Retrieve <canvas> element
 var gl = getWebGLContext(canvas); // Get the rendering context for WebGL
 var vertex_shader_source =
-	'attribute vec4 a_Position;\n' +
 	'attribute vec4 a_Color;\n' +
 	'attribute vec4 a_Normal;\n' +	 // Normal
-	'uniform mat4 u_ModelMatrix;\n' +
-	'uniform mat4 u_NormalMatrix;\n' +
-	'uniform mat4 u_ViewMatrix;\n' +
-	'uniform mat4 u_ProjMatrix;\n' +
+	'attribute vec4 a_Position;\n' +
 	'uniform vec3 u_LightColor;\n' + // Light color
 	'uniform vec3 u_LightDirection;\n' + // Light direction (in the world coordinate, normalized)
 	'uniform vec3 u_LightPosition;\n' + // Light Position
+	'uniform mat4 u_ModelMatrix;\n' +
+	'uniform mat4 u_NormalMatrix;\n' +
+	'uniform mat4 u_ProjMatrix;\n' +
+	'uniform mat4 u_ViewMatrix;\n' +
 	'varying vec4 v_Color;\n' +
+	'varying vec3 v_LightPosition;\n' +
 	'varying vec3 v_Normal;\n' +
 	'varying vec3 v_Position;\n' +
-	'varying vec3 v_LightPosition;\n' +
 	'uniform bool u_togglePointLighting;\n' +
 	'void main() {\n' +
 		'gl_Position = u_ProjMatrix * u_ViewMatrix * u_ModelMatrix * a_Position;\n' +
@@ -89,7 +89,10 @@ var camera = {
 		'x' : 0, // The rotation x angle (degrees)
 		'y' : 0  // The rotation y angle (degrees)
 	},
-	'world_view' : {
+	'option_state' : 0,
+	'options': [
+	{
+		'name' : "World View",
 		'setLookat': [
 		-45,  45, -45, 
 		  0,   -plane.x/3,   0, 
@@ -102,7 +105,8 @@ var camera = {
 			1500
 		],
 	},
-	'follow_car' : {
+	{ //follow the car
+		'name' : "Car View",
 		'setLookat' : [
 		car.position.x, 25, 50, car.position.x, 0, car.position.z, 0, 1, -10],
 		'setPerspective' : [
@@ -111,15 +115,28 @@ var camera = {
 			1, 
 			120
 		],
+	},
+	{ //follow the car
+		'name' : "Birds Eye",
+		'setLookat' : [
+		car.position.x, 60, car.position.z, 10, 10, 10, 0, 1, 0],
+		'setPerspective' : [
+			40, 
+			canvas.width / canvas.height, 
+			1, 
+			120
+		],
 	}
+
+	],
 };
 var settings = {
 	toggle_lighting: true,
-	cameraview : camera.world_view,
+	cameraview : camera.options[camera.option_state],
 	bg_color : [0.2,0.9,0.5],
 	light_color : [1,1,1],
-	light_direction : [0,1,0],
-	light_position : [0,5,0],
+	light_direction : [1,2,0],
+	light_position : [0,20,0],
 	ambient_light : [1,1,1],
 };
 var stores = {
@@ -208,7 +225,7 @@ var goodkeys = {
 	'left' : 65,
 	'space' : 32,
 	'toggle' : 84,
-	'camera' : 86
+	'camera' : 69,
 };
 
 document.onkeydown = function(ev){
@@ -217,6 +234,15 @@ document.onkeydown = function(ev){
 		case goodkeys.space:
 			// toggle door
 			car.lambo = !car.lambo;
+			break;
+		case goodkeys.camera:
+			if (camera.option_state +1 < camera.options.length){
+				camera.option_state += 1;
+			} else {
+				camera.option_state = 0;
+			}
+			settings.cameraview = camera.options[camera.option_state];
+			console.log("camera state:",camera.option_state)
 			break;
 		case goodkeys.toggle:
 			settings.toggle_lighting = !settings.toggle_lighting;
@@ -533,6 +559,12 @@ function draw(gl, u) {
 	// toggle lighting
 	gl.uniform1i(stores.u.isToggleLighting, settings.toggle_lighting);
 
+	if (camera.option_state === 2){
+		settings.cameraview.setLookat = [car.position.x, 60, car.position.z, car.position.x,0,car.position.z,1,0, 0];
+	} else if (camera.option_state === 1){
+		settings.cameraview.setLookat = [car.position.x, 25, 20, car.position.x, 0, car.position.z, 0, 1, -10],
+		settings.cameraview.setPerspective= [40, canvas.width / canvas.height, 1, 120];
+	}
 	// manage camera
 	var sl = settings.cameraview.setLookat;
 	stores.matrices.view.setLookAt(sl[0],sl[1],sl[2],sl[3],sl[4],sl[5],sl[6],sl[7],sl[8]);
@@ -543,6 +575,8 @@ function draw(gl, u) {
 	// Pass the model, view, and projection matrix to the uniform variable respectively
 	gl.uniformMatrix4fv(stores.u.ViewMatrix, false, stores.matrices.view.elements);
 	gl.uniformMatrix4fv(stores.u.ProjMatrix, false, stores.matrices.projection.elements);
+
+	document.getElementById("camera_view").innerHTML = settings.cameraview.name;
 
 }
 
