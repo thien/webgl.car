@@ -1,7 +1,6 @@
 # Graphics Summative
 ## Cmkv68
 
-
 A) _Describe the difference between **attribute**, **uniform**, and **varying** in shader programming._
 
 Attribute: Read only, Global Variables that can change per vertex. They're passed from OpenGL application to the vertex shaders. It can only be used in vertex shaders.
@@ -14,49 +13,43 @@ B) _Suppose you want to use a single array in the main() function of a WebGL pro
 
 _Also write down the programming statements for constructing the corresponding vertex buffer objects and assigning the array data to become the position and colour attributes of the vertex shader._
 
-	//
-	// Inside main()
-	//
-
-	 var verticesColors = new Float32Array([
-    0.75,  1.0,  -4.0,  0.4,  1.0,  0.4,
-    0.25, -1.0,  -4.0,  0.4,  1.0,  0.4,
-    1.25, -1.0,  -4.0,  1.0,  0.4,  0.4, 
-    1.25, -1.0, -2.0,   1.0,  1.0,  0.4,
-    -1.25, -1.0, -3.0,  1.0,  1.0,  0.4,
-    -0.25, -1.0,  4.0,  1.0,  0.4,  0.4, 
+	var verticesColors = new Float32Array([
+		-20.0,  0.0,   0.0,  1.0,  1.0,  1.0,
+		 20.0,  0.0,   0.0,  1.0,  1.0,  1.0,
+		 0.0,  20.0,   0.0,  1.0,  1.0,  1.0, 
+		 0.0, -20.0,   0.0,  1.0,  1.0,  1.0,
+		 0.0,   0.0, -20.0,  1.0,  1.0,  1.0, 
+		 0.0,   0.0,  20.0,  1.0,  1.0,  1.0 
 	]);
 	var n = 6;
 
-	// Create a buffer object
-	var vertexColorbuffer = gl.createBuffer();  
+	var vertexColorBuffer = gl.createBuffer();  
 
-	// Write the vertex coordinates and color to the buffer object
-
-	gl.bindBuffer(gl.ARRAY_BUFFER, vertexColorbuffer);
+	gl.bindBuffer(gl.ARRAY_BUFFER, vertexColorBuffer);
 	gl.bufferData(gl.ARRAY_BUFFER, verticesColors, gl.STATIC_DRAW);
 
 	var FSIZE = verticesColors.BYTES_PER_ELEMENT;
 
-	// Assign the buffer object to a_Position and enable the assignment
+	//Get the storage location of a_Position, assign and enable buffer
 
 	var a_Position = gl.getAttribLocation(gl.program, 'a_Position');
 
 	gl.vertexAttribPointer(a_Position, 3, gl.FLOAT, false, FSIZE * 6, 0);
+	
+	// Enable the assignment of the buffer object
 	gl.enableVertexAttribArray(a_Position);
 
-	// Assign the buffer object to a_Color and enable the assignment
+	// Get the storage location of a_Position, assign buffer and enable
+	
 	var a_Color = gl.getAttribLocation(gl.program, 'a_Color');
-	if(a_Color < 0) {
-	console.log('Failed to get the storage location of a_Color');
-	return -1;
-	}
 
 	gl.vertexAttribPointer(a_Color, 3, gl.FLOAT, false, FSIZE * 6, FSIZE * 3);
-	gl.enableVertexAttribArray(a_Color);
+	
+	// Enable the assignment of the buffer object
+	gl.enableVertexAttribArray(a_Color); 
 
-	return n;
-
+	// Unbind the buffer object
+	gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
 C) _Draw the scene graph of the 3D car model as described in question 2. [6 marks]_
 

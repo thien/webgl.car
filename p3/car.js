@@ -10,91 +10,53 @@ var vertex_shader_source =
 	'uniform mat4 u_ProjMatrix;\n' +
 	'uniform vec3 u_LightColor;\n' + // Light color
 	'uniform vec3 u_LightDirection;\n' + // Light direction (in the world coordinate, normalized)
-	'uniform vec3 u_AmbientLight;\n' + // Ambient Light
 	'uniform vec3 u_LightPosition;\n' + // Light Position
 	'varying vec4 v_Color;\n' +
 	'varying vec3 v_Normal;\n' +
 	'varying vec3 v_Position;\n' +
 	'varying vec3 v_LightPosition;\n' +
-	'uniform bool u_isLighting;\n' +
 	'uniform bool u_togglePointLighting;\n' +
-	// 'uniform mat4 gl_Position;\n' +
 	'void main() {\n' +
-	'  gl_Position = u_ProjMatrix * u_ViewMatrix * u_ModelMatrix * a_Position;\n' +
-	
-	// '  gl_Position = u_MvpMatrix * a_Position;\n' + 
-
+		'gl_Position = u_ProjMatrix * u_ViewMatrix * u_ModelMatrix * a_Position;\n' +
 		'if(u_togglePointLighting)\n' +
 			'{\n' +
-			// // !!! Point Light Object
-			// // // calculate world coordinate of the vortex
-			// '	vec4 vertexPosition = u_ModelMatrix * a_Position; \n' +
-			// '	vec3 lightDirection = normalize(u_LightPosition - vec3(vertexPosition)); \n' +
-
-			// // // //  make length of normal 1.0 [Directional Lighting]
-			// '	vec3 normal = normalize((u_NormalMatrix * a_Normal).xyz);\n' +
-
-			// // // // dot product of light direction/ orientation of surface
-			// '	float nDotL = max(dot(lightDirection, normal), 0.0);\n' +
-			// // // // Calculate the color due to diffuse reflection
-			// '	vec3 diffuse = u_LightColor * a_Color.rgb * nDotL;\n' +
-
-			// // // // calculate the colour due to ambient reflection
-			// '	vec3 ambient = u_AmbientLight * a_Color.rgb;\n' +
-			// // // // add surface colors due to diffuse and ambient reflection
-			// '	v_Color = vec4(diffuse + ambient, a_Color.a); \n' +
-
-			// // // deal with calculating colour per fragment
-			// // 'v_Position = vec3(u_ModelMatrix * a_Position);\n' +
-			// // 'v_Normal = normalize(vec3(u_NormalMatrix * a_Normal));\n' +
-			// 'v_LightPosition = u_LightPosition;'+
-					'v_Position = vec3(u_ModelMatrix * a_Position);\n' +
-					'v_Normal = normalize(vec3(u_NormalMatrix * a_Normal));\n' +
-					'v_Color = a_Color;\n' +
-					'v_LightPosition = u_LightPosition;\n' +
-
-		'  }\n' +
-		'  else\n' +
-			'  {\n' +
-				// Make the length of the normal 1.0
-				' vec3 normal = normalize(vec3(a_Normal));\n' +
-				// Dot product of light direction and orientation of a surface
-				' float nDotL = max(dot(u_LightDirection, normal), 0.0);\n' +
-				// Calculate the colour due to diffuse reflection
-				' vec3 diffuse = u_LightColor * vec3(a_Color) * nDotL;\n' +
-				' v_Color = vec4(diffuse, a_Color.a);\n' +
-		'  }\n' +
+				'v_Position = vec3(u_ModelMatrix * a_Position);\n' +
+				'v_Normal = normalize(vec3(u_NormalMatrix * a_Normal));\n' +
+				'v_Color = a_Color;\n' +
+				'v_LightPosition = u_LightPosition;\n' +
+		'}\n' +
+		'else\n' +
+		'{\n' +
+			'vec3 normal = normalize(vec3(a_Normal));\n' +
+			'float nDotL = max(dot(u_LightDirection, normal), 0.0);\n' +
+			'vec3 diffuse = u_LightColor * vec3(a_Color) * nDotL;\n' +
+			'v_Color = vec4(diffuse, a_Color.a);\n' +
+		'}\n' +
 	'}\n'; // Vertex shader program
 var fragment_shader_source =
 	'#ifdef GL_ES\n' +
 	'precision highp float;\n' +
 	'#endif\n' +
 
-  'varying vec3 v_LightPosition;\n' +
-  'varying vec4 v_Color;\n' +
-  'varying vec3 v_Normal;\n' +
-  'varying vec3 v_Position;\n' +
-  'uniform vec3 u_LightColor;\n' +
-  'uniform vec3 u_AmbientLight;\n' +
-  'uniform bool u_isPoint;\n' +
-   'uniform bool u_togglePointLighting;\n' +
+	'varying vec3 v_LightPosition;\n' +
+	'varying vec4 v_Color;\n' +
+	'varying vec3 v_Normal;\n' +
+	'varying vec3 v_Position;\n' +
+	'uniform vec3 u_LightColor;\n' +
+	'uniform bool u_isPoint;\n' +
+	'uniform bool u_togglePointLighting;\n' +
 	'void main() {\n' +
 		'if(u_togglePointLighting)\n' +
-		'  {\n' +
-			  ' vec3 normal = normalize(v_Normal);\n' +
-			  // Normalize normal because it's interpolated and not 1.0 (length)
-			  // Calculate the light direction and make it 1.0 in length
-			  ' vec3 lightDirection = normalize(v_LightPosition - v_Position);\n' +
-			  // The dot product of the light direction and the normal
-			  ' float nDotL = max(dot(lightDirection, normal), 0.0);\n' +
-			  // Calculate the final color from diffuse and ambient reflection
-			  ' vec3 diffuse = u_LightColor * v_Color.rgb * nDotL;\n' +
-			  ' vec3 ambient = (0.1,0.1,0.1) * v_Color.rgb;\n' +
-			  ' gl_FragColor = vec4(diffuse + ambient, v_Color.a);\n' +
-		'  }\n' +
+		'{\n' +
+			'vec3 normal = normalize(v_Normal);\n' +
+			'vec3 lightDirection = normalize(v_LightPosition - v_Position);\n' +
+			'float nDotL = max(dot(lightDirection, normal), 0.0);\n' +
+			'vec3 diffuse = u_LightColor * v_Color.rgb * nDotL;\n' +
+			'gl_FragColor = vec4(diffuse, v_Color.a);\n' +
+		'}\n' +
 		'else {\n' + 
-		'  gl_FragColor = v_Color;\n' +
-		'  }\n' +
+			'gl_FragColor = v_Color;\n' +
+		'}\n' +
 	'}\n'; // Fragment shader program
 var car = {
 	'enabled' : true,
@@ -116,9 +78,9 @@ var car = {
 	},
 };
 var plane = {
-	'x' : 50,
+	'x' : 70,
 	'y' : 1,
-	'z' : 50,
+	'z' : 70,
 	'enabled': true,
 	'colour' : [0.8,0.5,0.8]
 };
@@ -155,10 +117,10 @@ var settings = {
 	toggle_lighting: true,
 	cameraview : camera.world_view,
 	bg_color : [0.2,0.9,0.5],
-	light_color : [1,1,0.5],
+	light_color : [1,1,1],
 	light_direction : [0,1,0],
 	light_position : [0,5,0],
-	ambient_light : [0.1,0.1,0.1],
+	ambient_light : [1,1,1],
 };
 var stores = {
 	u : { // storage locations of uniform attributes
@@ -179,6 +141,7 @@ var stores = {
 }
 var keypresses = {};
 var g_matrixstack = [];// Array for storing a matrix
+var draw_ready = false;
 
 function initUniformAttributes(){
 	stores.u.ModelMatrix = 		gl.getUniformLocation(gl.program, 'u_ModelMatrix');
@@ -191,7 +154,6 @@ function initUniformAttributes(){
 	stores.u.LightPosition = 	gl.getUniformLocation(gl.program, 'u_LightPosition');
 	stores.u.AmbientLight = 	gl.getUniformLocation(gl.program, 'u_AmbientLight');
 	// Trigger using lighting or not
-	stores.u.isLighting = 		gl.getUniformLocation(gl.program, 'u_isLighting'); 
 	stores.u.isToggleLighting = gl.getUniformLocation(gl.program, 'u_togglePointLighting'); 
 }
 
@@ -228,12 +190,14 @@ function initialise() {
 	// apply lighting
 	gl.uniform1i(stores.u.isLighting, true);
 
-	// draw the first screen.
-	draw(gl, stores.u);
+	// simulate ready keypress
+	setTimeout(function() {keypresses[32] = true;}, 1);
+	setTimeout(function() {keypresses[32] = false;}, 150);
+
 	// draw following screens
 	setInterval(function() {
 		frame(gl, stores.u);
-	}, 17) //60fps
+	}, 17); //60fps
 }
 
 var goodkeys = {
@@ -243,7 +207,8 @@ var goodkeys = {
 	'up' : 87,
 	'left' : 65,
 	'space' : 32,
-	'toggle' : 84
+	'toggle' : 84,
+	'camera' : 86
 };
 
 document.onkeydown = function(ev){
@@ -265,9 +230,17 @@ document.onkeyup = function(ev){
 };
 
 function frame(gl, u) {
+	var check = false;
+
+	if (!draw_ready){
+		draw_ready = true;
+		check = true;
+	}
+
 	for (var keycode in keypresses) {
 		if (keypresses[keycode]) {
 			keydown(keycode);
+			check = true
 		}
 	}
 	if (car.velocity > 0) {
@@ -291,7 +264,10 @@ function frame(gl, u) {
 		car.front.rotation = (car.front.rotation - 180) % 360;
 	}
 
-	draw(gl, u);
+	if (car.velocity > 0 || check){
+		// using a check to make sure we don't waste processor time
+		draw(gl, u);
+	}
 }
 
 function keydown(keycode) {
@@ -440,14 +416,6 @@ function draw(gl, u) {
 		console.log('Failed to set the vertex information');
 		return;
 	}
-
-	// // light pointer
-	// pushMatrix(stores.matrices.model);
-	// manipulateColourBuffer(gl, settings.light_color);
-	// stores.matrices.model.translate(settings.light_position[0], settings.light_position[1], settings.light_position[2]); // Translation
-	// stores.matrices.model.scale(0.5,0.5,0.5); // Scale
-	// drawbox(gl, stores.u.ModelMatrix, stores.u.NormalMatrix, n);
-	// stores.matrices.model = popMatrix();
 
 	if (plane.enabled){
 
